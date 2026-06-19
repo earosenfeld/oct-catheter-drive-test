@@ -20,6 +20,19 @@ by how *uniformly* that core rotates and how *accurately* it is pulled back:
 - **Rotational jitter / wow & flutter** — revolution-to-revolution speed instability.
 - **Pullback accuracy & uniformity** — sets the longitudinal (pullback-axis) image scale.
 
+## How it works
+
+A synthetic (or measured) drive signal — the rotation and pullback encoder
+channels — flows through the metric analyzers, each result is compared against
+`spec.yaml`, and a PASS/FAIL characterization report is stamped.
+
+```mermaid
+flowchart LR
+    A["Drive signal<br/>rotation + pullback<br/>encoders"] --> B["Metrics<br/>• NURD index<br/>• spectral NURD<br/>• rotational stability<br/>• pullback accuracy<br/>• angular error"]
+    B --> C["spec.yaml<br/>acceptance limits"]
+    C --> D["PASS / FAIL<br/>characterization report"]
+```
+
 ## Metrics implemented
 
 | Metric | Definition |
@@ -34,6 +47,39 @@ by how *uniformly* that core rotates and how *accurately* it is pulled back:
 A **synthetic drive-signal generator** injects *known* NURD harmonics, jitter and
 pullback error, so every metric is validated against ground truth in the test
 suite (inject a known distortion → assert the analyzer recovers it).
+
+## Visualizations
+
+Generated from the real API by `scripts/make_figures.py` (fixed seeds, headless),
+contrasting a clean in-spec drive against a degraded one (binding torque cable:
+strong 1× + 3× NURD, jitter, 8% pullback overspeed). Engineering characterization
+of drive mechanics only — no clinical or diagnostic interpretation.
+
+![Angular velocity wobble](assets/angular_velocity.png)
+
+*Instantaneous rotation rate across four revolutions. The clean drive (blue)
+holds ~6000 rpm; the degraded drive (red) speeds up and slows down within each
+revolution — this within-rev modulation is NURD. The NURD index `std(ω)/mean(ω)`
+rises from 0.7% to 13.3%.*
+
+![Spectral NURD](assets/nurd_spectrum.png)
+
+*Harmonic content of `ω(t)` at multiples of the rotation frequency (`f_rot` =
+100 Hz), normalized to DC. The dominant once-per-revolution (1×) component
+flags the bind; the recovered ratios match the injected harmonic amplitudes
+(`H_k ≈ a_k/2`).*
+
+![Pullback linearity](assets/pullback_linearity.png)
+
+*Pullback position vs time with a constant-velocity fit overlaid. The measured
+speed (21.6 mm/s) exceeds the commanded 20.0 mm/s by +8.0% — a calibration bias
+— while linearity stays high (R² = 0.99998).*
+
+![Per-rotation NURD map](assets/nurd_per_rotation.png)
+
+*NURD index computed for each completed revolution, against the `spec.yaml`
+acceptance limit (5%). The clean drive stays near 0.7%; the degraded drive sits
+~13% across every revolution, in the fail zone.*
 
 ## Install
 
