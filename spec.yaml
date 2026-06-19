@@ -1,0 +1,27 @@
+# OCT catheter drive characterization spec (acceptance limits).
+#
+# Engineering bench characterization of drive MECHANICS only. These limits
+# govern the rotary/pullback drive performance, NOT image diagnostic quality
+# or any clinical/medical-efficacy criterion.
+#
+# Representative numbers for a ~100 rev/s intravascular OCT drive. Tune per
+# product. Each metric is checked PASS/FAIL by oct_drive_test.spec.characterize.
+
+name: "OCT catheter drive — example acceptance spec"
+
+# Commanded proximal rotation rate [revolutions per minute]. 6000 rpm = 100 rev/s.
+rpm_nominal: 6000.0
+
+# Allowed magnitude of mean RPM error vs nominal [%].
+rpm_tolerance_pct: 2.0
+
+# Allowed overall NURD index = std(omega)/mean(omega) over the record [%].
+# NURD is the #1 image-quality killer; tight limit.
+nurd_index_max_pct: 5.0
+
+# Allowed magnitude of mean pullback-speed error vs commanded [%].
+# (Checked only when a pullback speed is commanded.)
+pullback_accuracy_pct: 3.0
+
+# Allowed rotational jitter = revolution period-to-period std [%].
+jitter_max_pct: 2.0

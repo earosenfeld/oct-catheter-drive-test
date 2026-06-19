@@ -1,0 +1,24 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>OCT Drive Characterization</title>
+<style>
+body { font-family: system-ui, sans-serif; margin: 2rem; color:#1f2328; }
+table { border-collapse: collapse; margin-top: 1rem; }
+th, td { border: 1px solid #d0d7de; padding: 6px 12px; text-align:left; }
+th { background:#f6f8fa; }
+.verdict { color:#cf222e; font-weight:bold; font-size:1.2rem; }
+.disclaimer { color:#656d76; font-style:italic; margin-top:.5rem; }
+</style></head>
+<body>
+<h1>OCT Drive Characterization Report</h1>
+<p><b>Spec:</b> OCT catheter drive — example acceptance spec</p>
+<p class="verdict">Overall result: FAIL</p>
+<p class="disclaimer">Engineering bench characterization of drive mechanics only.
+No clinical, diagnostic, or medical-efficacy claim is made.</p>
+<table>
+<tr><th>Parameter</th><th>Measured</th><th>Limit</th><th>Check</th><th>Result</th></tr>
+<tr><td>NURD index</td><td>13.45 %</td><td>5 %</td><td><= limit</td><td style='color:#cf222e;font-weight:bold'>FAIL</td></tr>
+<tr><td>RPM mean error</td><td>0.01234 % (abs)</td><td>2 % (abs)</td><td>|RPM error| <= limit</td><td style='color:#1a7f37;font-weight:bold'>PASS</td></tr>
+<tr><td>Rotational jitter (period std)</td><td>0.7237 %</td><td>2 %</td><td><= limit</td><td style='color:#1a7f37;font-weight:bold'>PASS</td></tr>
+<tr><td>Pullback speed error</td><td>7.995 % (abs)</td><td>3 % (abs)</td><td>|speed error| <= limit</td><td style='color:#cf222e;font-weight:bold'>FAIL</td></tr>
+</table>
+</body></html>
