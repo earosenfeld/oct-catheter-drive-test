@@ -2,8 +2,9 @@
 
 Bench **characterization toolkit for the drive mechanics of intravascular OCT
 (Optical Coherence Tomography) catheters** — rotational stability, **NURD
-(Non-Uniform Rotational Distortion)**, and pullback accuracy — with
-ground-truth-validated metrics and an automated pass/fail characterization report.
+(Non-Uniform Rotational Distortion)** measurement **and correction**, and
+pullback accuracy — with ground-truth-validated metrics and an automated
+pass/fail characterization report.
 
 > Engineering verification & validation of *drive mechanics* only. This is a
 > simulation / signal-analysis bench and makes **no clinical or diagnostic claims**.
@@ -81,6 +82,56 @@ speed (21.6 mm/s) exceeds the commanded 20.0 mm/s by +8.0% — a calibration bia
 acceptance limit (5%). The clean drive stays near 0.7%; the degraded drive sits
 ~13% across every revolution, in the fail zone.*
 
+## NURD correction
+
+Measuring NURD is only half the job — the toolkit can also **correct** it. NURD
+arises because A-lines are acquired uniformly in *time* while the fiber core, due
+to torque-cable friction, rotates non-uniformly in *angle*; consecutive A-lines
+are therefore separated by a varying azimuthal angle, smearing the frame. Real
+OCT systems fix this by **resampling the A-line stream from its non-uniform
+angular spacing back onto a uniform angular grid**, using the measured
+instantaneous rotation (rotary encoder, or here the generator ground truth).
+
+`oct_drive_test.correction` implements exactly that re-gridding:
+
+1. Build a uniform angular grid (`n_per_rev` points per revolution, an exact
+   integer per 2π so every revolution samples identically).
+2. **Invert the measured cumulative angle** `θ(t)` — for each target grid angle,
+   interpolate the time at which the core actually passed through it
+   (`t = θ⁻¹(angle)`).
+3. Resample the per-A-line payload at those corrected times → an equi-angular
+   A-line stream.
+
+```python
+from oct_drive_test import correction
+
+# measured (NURD-distorted) drive signal from the generator/encoder
+corr = correction.correct_drive_signal(sig, n_per_rev=512)
+corr.nurd_index_before     # std(ω)/mean(ω) of the raw, uniform-time stream
+corr.nurd_index_after      # residual on the corrected uniform-angle grid (~0)
+corr.improvement_factor    # before / after
+corr.theta_grid, corr.t_grid   # uniform angle grid + corrected A-line times
+```
+
+The residual is the **same** `std/mean` NURD index applied to the corrected
+stream's angular increments (`residual_nurd`), not a relaxed metric — on a
+uniform-angle grid those increments are constant, so the index collapses to the
+numerical floor. The validation suite injects a known ~13% NURD, confirms the
+index is high, then asserts the residual drops by many orders of magnitude after
+correction, while a clean (NURD-free) signal is left essentially untouched (no
+distortion is injected).
+
+![NURD correction before vs after](assets/nurd_correction.png)
+
+*A-line azimuthal sampling before vs after angular resampling, for the degraded
+(binding-cable) drive. **Top:** the spacing between consecutive A-lines wobbles
+0.75°–2.1° when sampled uniformly in time (red), but is pinned to the ideal
+1.406°/A-line after re-gridding (blue). **Bottom:** the cumulative angular
+position error vs the ideal uniform grid sweeps ±12° before correction and
+collapses to ~0 after. The NURD index falls from 13.9% to the numerical floor.
+Engineering characterization of drive-correction signal processing only — no
+clinical or diagnostic interpretation.*
+
 ## Install
 
 ```bash
@@ -118,6 +169,7 @@ stamps **PASS/FAIL per limit** — the structure of a real V&V characterization 
 oct_drive_test/
 ├── generator.py   # synthetic drive-signal generator (ground-truth injection)
 ├── nurd.py        # NURD index + spectral / per-rotation NURD
+├── correction.py  # NURD correction: encoder-based angular resampling
 ├── rotation.py    # rotational stability: jitter, wow/flutter, RPM stats
 ├── pullback.py    # pullback speed accuracy & uniformity
 ├── angular.py     # angular position error

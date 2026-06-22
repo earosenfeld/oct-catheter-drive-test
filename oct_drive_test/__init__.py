@@ -12,6 +12,7 @@ Public API
 - generator: synthetic ground-truth drive signals (rotation + pullback) with
   injectable NURD, jitter, and pullback speed error.
 - nurd: Non-Uniform Rotational Distortion metrics.
+- correction: NURD correction by encoder-based angular resampling.
 - rotation: rotational stability (wow/flutter, period-to-period, RPM stats).
 - pullback: pullback speed accuracy / uniformity / linearity.
 - angular: cumulative angular position error per revolution.
@@ -22,7 +23,16 @@ Public API
 
 from __future__ import annotations
 
-from . import angular, backlash, generator, nurd, pullback, rotation, spec
+from . import (
+    angular,
+    backlash,
+    correction,
+    generator,
+    nurd,
+    pullback,
+    rotation,
+    spec,
+)
 from ._signal import DriveSignal
 from .generator import (
     NurdHarmonic,
@@ -39,6 +49,7 @@ __all__ = [
     "generate_drive_signal",
     "generator",
     "nurd",
+    "correction",
     "rotation",
     "pullback",
     "angular",

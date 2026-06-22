@@ -43,7 +43,7 @@ PALETTE = ["#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#0891b2"]
 # ----------------------------------------------------------------------------
 # Real API.
 # ----------------------------------------------------------------------------
-from oct_drive_test import nurd, pullback
+from oct_drive_test import correction, nurd, pullback
 from oct_drive_test.generator import (
     NurdHarmonic,
     PullbackParams,
@@ -308,6 +308,133 @@ def fig_nurd_per_rotation(path: Path) -> None:
     plt.close(fig)
 
 
+# ----------------------------------------------------------------------------
+# Figure 5: NURD correction -- A-line angular sampling before vs after re-grid.
+# ----------------------------------------------------------------------------
+def fig_nurd_correction(path: Path) -> None:
+    """Before/after angular resampling, limited by the encoder's angle accuracy.
+
+    Top: azimuthal spacing between consecutive A-lines [deg] -- wobbles for the
+    raw, NURD-distorted stream; pinned near the ideal step after correction.
+    Bottom: cumulative angular position error vs the ideal uniform-angle grid.
+    The corrector only ever sees the rotary encoder's *estimate* of the angle, so
+    the residual after correction is set by the encoder's accuracy (here a
+    realistic low-order eccentricity error), not by the resampler -- a believable
+    few percent, not a numerically-perfect zero.
+    """
+    # A few revolutions so the once-per-rev sampling wobble is legible.
+    n_rev = 3
+    duration = n_rev / F_ROT  # 0.03 s -> 3 revolutions
+    fs = 40_000.0
+    degr = build_degraded(duration, fs)
+
+    n_per_rev = 256  # output A-lines per revolution after re-gridding
+    times = degr.t
+    theta_true = degr.theta - degr.theta[0]
+
+    # The corrector never knows the true angle -- only what the rotary encoder
+    # reports. Model the dominant real-world encoder error: low-order eccentricity
+    # (1x + 2x per rev) at a few tenths of a degree. It is smooth and small, so the
+    # measured angle stays strictly increasing (invertible), but it is exactly the
+    # part of the distortion the resampler cannot remove.
+    enc_amp1 = np.radians(0.30)  # 1x/rev eccentricity, 0.30 deg
+    enc_amp2 = np.radians(0.12)  # 2x/rev harmonic,     0.12 deg
+    theta_meas = (
+        theta_true
+        + enc_amp1 * np.sin(2.0 * np.pi * F_ROT * times + 0.7)
+        + enc_amp2 * np.sin(4.0 * np.pi * F_ROT * times + 1.9)
+    )
+
+    # Correct using the MEASURED angle; judge the result against the TRUE angle
+    # achieved at the corrected acquisition times.
+    corr = correction.correct_nurd(times, theta_meas, n_per_rev=n_per_rev)
+    theta_corr = np.interp(corr.t_grid, times, theta_true)
+    theta_corr = theta_corr - theta_corr[0]
+
+    nurd_before_pct = 100.0 * correction.residual_nurd(theta_true)
+    nurd_after_pct = 100.0 * correction.residual_nurd(theta_corr)
+    factor = nurd_before_pct / nurd_after_pct if nurd_after_pct > 0 else float("inf")
+
+    # --- BEFORE: raw A-lines acquired at uniform TIME -> non-uniform ANGLE. ---
+    # Down-sample the raw stream to a comparable A-line count so the per-line
+    # spacing is on the same footing as the corrected grid (one frame's worth).
+    total_lines = n_rev * n_per_rev
+    pick = np.linspace(0, theta_true.size - 1, total_lines).round().astype(int)
+    theta_raw_lines = theta_true[pick]
+    idx_raw = np.arange(theta_raw_lines.size)
+
+    # Per-A-line azimuthal spacing [deg], wrapped into a single revolution.
+    spacing_raw = np.degrees(np.diff(theta_raw_lines))
+    ideal_step_deg = 360.0 / n_per_rev
+    # Cumulative deviation from the ideal uniform-angle grid [deg].
+    ideal_raw = idx_raw * np.radians(ideal_step_deg)
+    dev_raw = np.degrees(theta_raw_lines - ideal_raw)
+    dev_raw = dev_raw - dev_raw.mean()  # zero-mean (registration is relative)
+
+    # --- AFTER: true angle achieved at the corrected (re-gridded) times. ---
+    idx_corr = np.arange(theta_corr.size)
+    spacing_corr = np.degrees(np.diff(theta_corr))
+    ideal_corr = idx_corr * corr.dtheta
+    dev_corr = np.degrees(theta_corr - ideal_corr)
+    dev_corr = dev_corr - dev_corr.mean()
+
+    fig, (ax1, ax2) = plt.subplots(
+        2, 1, figsize=(9.0, 6.6), sharex=True,
+        gridspec_kw={"height_ratios": [1.0, 1.0], "hspace": 0.16},
+    )
+
+    # Top panel: per-A-line angular spacing.
+    ax1.plot(idx_raw[1:], spacing_raw, color=RED, lw=1.8,
+             label="before correction (acquired uniform-in-time)", zorder=3)
+    ax1.plot(idx_corr[1:], spacing_corr, color=BLUE, lw=2.0,
+             label="after correction (resampled uniform-in-angle)", zorder=4)
+    ax1.axhline(ideal_step_deg, color="#334155", lw=1.0, ls="--", zorder=2)
+    ax1.text(idx_corr[-1], ideal_step_deg,
+             f"  ideal {ideal_step_deg:.3f}°/A-line", va="center", ha="left",
+             fontsize=9, color="#334155")
+    ax1.set_ylabel("A-line angular\nspacing [deg]")
+    ax1.set_title(
+        "NURD correction: A-line azimuthal sampling before vs after re-gridding"
+    )
+    ax1.legend(loc="upper right", ncol=1, fontsize=9)
+
+    # Bottom panel: cumulative angular position error vs ideal uniform grid.
+    ax2.plot(idx_raw, dev_raw, color=RED, lw=1.8,
+             label="before (non-uniform)", zorder=3)
+    ax2.plot(idx_corr, dev_corr, color=BLUE, lw=2.0,
+             label="after (uniform)", zorder=4)
+    ax2.axhline(0.0, color="#334155", lw=1.0, ls="--", zorder=2)
+    ax2.set_xlabel("A-line index (within frame)")
+    ax2.set_ylabel("angular position\nerror vs uniform [deg]")
+    ax2.set_xlim(0, total_lines)
+    ax2.legend(loc="upper center", ncol=2, fontsize=9)
+
+    # Mark revolution boundaries on both panels.
+    for r in range(1, n_rev):
+        for ax in (ax1, ax2):
+            ax.axvline(r * n_per_rev, color="#cbd5e1", lw=0.8, ls=":", zorder=1)
+
+    txt = (
+        f"NURD index  std(ω)/mean(ω)\n"
+        f"before:    {nurd_before_pct:5.2f} %\n"
+        f"after:     {nurd_after_pct:5.2f} %  (encoder-limited)\n"
+        f"reduction: {factor:,.1f}×"
+    )
+    ax2.text(
+        0.015, 0.04, txt, transform=ax2.transAxes, va="bottom", ha="left",
+        fontsize=9.5, family="monospace", zorder=6,
+        bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="#cbd5e1",
+                  lw=0.8, alpha=0.95),
+    )
+
+    fig.savefig(path)
+    plt.close(fig)
+    print(
+        f"  wrote {path.name}  (NURD {nurd_before_pct:.2f}% -> "
+        f"{nurd_after_pct:.2f}%, {factor:,.1f}x)"
+    )
+
+
 def main() -> int:
     ASSETS.mkdir(parents=True, exist_ok=True)
     print(f"Rendering figures -> {ASSETS}")
@@ -315,6 +442,7 @@ def main() -> int:
     fig_nurd_spectrum(ASSETS / "nurd_spectrum.png")
     fig_pullback_linearity(ASSETS / "pullback_linearity.png")
     fig_nurd_per_rotation(ASSETS / "nurd_per_rotation.png")
+    fig_nurd_correction(ASSETS / "nurd_correction.png")
     print("Done.")
     return 0
 
