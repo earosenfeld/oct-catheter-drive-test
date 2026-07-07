@@ -11,6 +11,13 @@ pass/fail characterization report.
 > Engineering verification & validation of *drive mechanics* only. This is a
 > simulation / signal-analysis bench and makes **no clinical or diagnostic claims**.
 
+![Animated polar B-scan of a vessel phantom, NURD-distorted vs encoder-corrected](assets/nurd_correction_demo.gif)
+
+*Same acquired A-lines, two angular grids: the uncorrected panel paints them at
+assumed-uniform angles (the vessel wall warps away from the true outline); the
+corrected panel rebuilds the grid from the encoder via `correct_nurd()` and the
+wall lands back on the phantom. Regenerate with `python scripts/make_demo_gif.py`.*
+
 ## Why this exists
 
 An OCT catheter images by spinning a fiber-optic core (typically ~100 rev/s) at
