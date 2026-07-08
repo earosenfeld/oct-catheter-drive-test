@@ -122,6 +122,15 @@ corr.improvement_factor    # before / after
 corr.theta_grid, corr.t_grid   # uniform angle grid + corrected A-line times
 ```
 
+**Encoder-limited residual.** Correcting with the generator's own angle makes
+the residual collapse to numerical zero — a tautology. `oct_drive_test/encoder.py`
+therefore models the real measurement chain (edge-timestamp decode: count-boundary
+crossings, electrical timing jitter, monotone decode), and
+`encoder.true_residual_nurd()` evaluates the *true* angle at the corrected
+A-line times. Under a 2048-count encoder with 0.5 µs edge jitter at 6000 rpm,
+a 0.16 NURD index corrects to a genuine ~0.026 residual — the physically
+meaningful limit, validated in `tests/test_encoder_limited.py`.
+
 The residual is the **same** `std/mean` NURD index applied to the corrected
 stream's angular increments (`residual_nurd`), not a relaxed metric — on a
 uniform-angle grid those increments are constant, so the index collapses to the
